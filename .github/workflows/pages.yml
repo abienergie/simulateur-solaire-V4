@@ -1,0 +1,49 @@
+name: GitHub Pages (static)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Si un build Vite a déjà été fait et qu'un dossier dist/ existe,
+      # on publie dist/. Sinon on publie la racine (.)
+      - name: Choose publish dir
+        id: pubdir
+        run: |
+          if [ -d dist ]; then
+            echo "path=dist" >> $GITHUB_OUTPUT
+          else
+            echo "path=." >> $GITHUB_OUTPUT
+          fi
+
+      # Fallback SPA : 404.html = index.html si présent
+      - name: SPA fallback
+        run: |
+          if [ -f "${{ steps.pubdir.outputs.path }}/index.html" ]; then
+            cp "${{ steps.pubdir.outputs.path }}/index.html" "${{ steps.pubdir.outputs.path }}/404.html" || true
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ steps.pubdir.outputs.path }}
+
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
