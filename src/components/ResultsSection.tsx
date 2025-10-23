@@ -20,7 +20,7 @@ export default function ResultsSection({ result, onModifyPower }: ResultsSection
         <div className="bg-blue-50 p-4 rounded-lg">
           <p className="text-sm text-gray-600">Production annuelle</p>
           <p className="text-2xl font-bold text-blue-600">
-            {result.productionAnnuelle.toLocaleString()} kWh/an
+            {(result?.productionAnnuelle ?? 0).toLocaleString()} kWh/an
           </p>
         </div>
 

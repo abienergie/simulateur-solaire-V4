@@ -61,7 +61,7 @@ export default function RecommendationDisplay({
             <h4 className="font-medium text-gray-900">Production solaire</h4>
           </div>
           <p className="text-2xl font-bold text-gray-900">
-            {recommendation.production.min.toLocaleString()} ~ {recommendation.production.max.toLocaleString()} kWh/an
+            {(recommendation?.production?.min ?? 0).toLocaleString()} ~ {(recommendation?.production?.max ?? 0).toLocaleString()} kWh/an
           </p>
           <p className="text-sm text-gray-600 mt-2">
             Cette installation peut couvrir de {couvertureMin}% à {couvertureMax}% de votre consommation actuelle

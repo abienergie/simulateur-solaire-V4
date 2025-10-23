@@ -24,7 +24,7 @@ export default function SunshineDisplay({ codePostal }: SunshineDisplayProps) {
       </div>
       <div className="flex items-baseline gap-2">
         <span className="text-3xl font-bold text-blue-600">
-          {ensoleillement.toLocaleString()}
+          {(ensoleillement ?? 0).toLocaleString()}
         </span>
         <span className="text-gray-600">kWh/m²/an</span>
       </div>
