@@ -1,16 +1,21 @@
 import { PVGISHourlyParams, PVGISHourlyResponse, ProcessedHourlyData } from '../../types/pvgisHourly';
 
-const PVGIS_HOURLY_URL = '/pvgis-api/v5_3/seriescalc';
 const LAST_SARAH3_YEAR = 2023;   // PVGIS 5.3: datasets étendus jusqu'à 2023
 
 export async function fetchPVGISHourly(params: PVGISHourlyParams): Promise<ProcessedHourlyData[]> {
   try {
     console.log('🔄 Appel API PVGIS horaire avec paramètres:', params);
-    
+
+    // Détection de l'environnement
+    const isDevelopment = import.meta.env.DEV;
+    const baseUrl = isDevelopment
+      ? '/pvgis-api'
+      : 'https://re.jrc.ec.europa.eu/api';
+
     // 1) Années sûres pour SARAH3
     const startyear = Math.min(params.startyear, LAST_SARAH3_YEAR);
     const endyear   = Math.min(params.endyear ?? params.startyear, LAST_SARAH3_YEAR);
-    
+
     const queryParams = new URLSearchParams({
       lat: params.lat.toString(),
       lon: params.lon.toString(),
@@ -35,7 +40,7 @@ export async function fetchPVGISHourly(params: PVGISHourlyParams): Promise<Proce
       queryParams.set('optimalinclination', '1');
     }
 
-    const apiUrl = `${PVGIS_HOURLY_URL}?${queryParams.toString()}`;
+    const apiUrl = `${baseUrl}/v5_3/seriescalc?${queryParams.toString()}`;
     console.log('🌐 URL API PVGIS:', apiUrl);
 
     const response = await fetch(apiUrl, {
