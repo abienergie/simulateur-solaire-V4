@@ -8,9 +8,12 @@ export async function fetchPVGISHourly(params: PVGISHourlyParams): Promise<Proce
 
     // Détection de l'environnement
     const isDevelopment = import.meta.env.DEV;
+    
+    // En dev : proxy Vite
+    // En prod : proxy CORS public
     const baseUrl = isDevelopment
       ? '/pvgis-api'
-      : 'https://re.jrc.ec.europa.eu/api';
+      : 'https://corsproxy.io/?https://re.jrc.ec.europa.eu/api';
 
     // 1) Années sûres pour SARAH3
     const startyear = Math.min(params.startyear, LAST_SARAH3_YEAR);

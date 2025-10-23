@@ -20,9 +20,12 @@ export async function getPVGISData(params: PVGISParams): Promise<PVGISResponse> 
   try {
     // Détection de l'environnement
     const isDevelopment = import.meta.env.DEV;
+    
+    // En dev : proxy Vite
+    // En prod : proxy CORS public
     const baseUrl = isDevelopment
       ? '/pvgis-api'
-      : 'https://re.jrc.ec.europa.eu/api';
+      : 'https://corsproxy.io/?https://re.jrc.ec.europa.eu/api';
 
     // Utiliser la version 5.3 de l'API pour tester SARAH3 et crystSi2025
     console.log('🔬 Test PVGIS v5.3 avec SARAH3 et crystSi2025...');
