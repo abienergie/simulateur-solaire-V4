@@ -6,6 +6,8 @@ import { formatCurrency } from '../utils/formatters';
 import { useBatteries } from '../hooks/useBatteries';
 import { useFinancialSettings } from '../contexts/FinancialSettingsContext';
 import { getSubscriptionPrice } from '../utils/calculations/priceCalculator';
+import { calculateHT } from '../utils/calculations/vatCalculator';
+import { useClient } from '../contexts/client';
 import SmartBatteryModal from './SmartBatteryModal';
 
 interface BatterySelectorProps {
@@ -29,6 +31,7 @@ export default function BatterySelector({
 }: BatterySelectorProps) {
   const { batteries: purchaseBatteries, loading: batteriesLoading } = useBatteries();
   const { settings } = useFinancialSettings();
+  const { clientInfo } = useClient();
   const [showOptions, setShowOptions] = useState(false);
   const [hasElectricVehicle, setHasElectricVehicle] = useState(false);
   const [includeSmartCharger, setIncludeSmartCharger] = useState(false);
@@ -229,7 +232,10 @@ export default function BatterySelector({
     return (annualCost / revenuAnnuel * 100) <= 7;
   };
 
-  const monthlyMyBatteryCost = installedPower * 1.20;
+  // MyBattery: 1€ HT/kWc/mois → 1.20€ TTC/kWc/mois (avec TVA 20%)
+  const monthlyMyBatteryCostTTC = installedPower * 1.20;
+  const monthlyMyBatteryCostHT = calculateHT(monthlyMyBatteryCostTTC);
+  const showVAT = clientInfo.typeClient === 'professionnel' && clientInfo.assujettieATVA === true;
 
   if (connectionType === 'total_sale') {
     return (
@@ -597,9 +603,20 @@ export default function BatterySelector({
                     <p className="text-sm text-blue-800">✓ Frais de mise en service : 179€ TTC</p>
                   </div>
                   <div className="bg-white rounded-lg p-3">
-                    <p className="text-sm text-blue-900">
-                      Coût mensuel : <strong>{formatCurrency(monthlyMyBatteryCost)}</strong>
-                    </p>
+                    {showVAT ? (
+                      <div className="text-blue-900">
+                        <p className="text-sm">
+                          Coût mensuel : <strong className="text-lg">{formatCurrency(monthlyMyBatteryCostHT)} HT</strong>
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {formatCurrency(monthlyMyBatteryCostTTC)} TTC
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-blue-900">
+                        Coût mensuel : <strong>{formatCurrency(monthlyMyBatteryCostTTC)}</strong>
+                      </p>
+                    )}
                   </div>
                   <p className="text-sm text-blue-800">
                     Le surplus récupéré = prix du kWh - {formatCurrency(0.0996)} de taxes
