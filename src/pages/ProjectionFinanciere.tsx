@@ -41,12 +41,20 @@ function ProjectionFinanciere() {
     return localStorage.getItem('includeEcojoko') === 'true';
   });
   
-  const { 
+  const {
     projection,
     parameters,
     updateParameters,
     calculateProjection
   } = useFinancialProjection();
+
+  // Mettre à jour calculateWithVAT quand le client change
+  useEffect(() => {
+    const shouldCalculateWithVAT = clientInfo.typeClient === 'professionnel' && clientInfo.assujettieATVA === true;
+    if (parameters.calculateWithVAT !== shouldCalculateWithVAT) {
+      updateParameters({ calculateWithVAT: shouldCalculateWithVAT });
+    }
+  }, [clientInfo.typeClient, clientInfo.assujettieATVA]);
 
   useEffect(() => {
     if (parameters.puissanceCrete && settings) {
