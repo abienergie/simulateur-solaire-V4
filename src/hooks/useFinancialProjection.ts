@@ -26,7 +26,8 @@ export function useFinancialProjection() {
       primeAutoconsommation: savedPrimeAutoconsommation ? parseFloat(savedPrimeAutoconsommation) : 0,
       remiseCommerciale: savedRemiseCommerciale ? parseFloat(savedRemiseCommerciale) : 0,
       connectionType: savedConnectionType || 'surplus',
-      batterySelection: savedBatterySelection ? JSON.parse(savedBatterySelection) : null
+      batterySelection: savedBatterySelection ? JSON.parse(savedBatterySelection) : null,
+      calculateWithVAT: false
     };
   });
   console.log('[useFinancialProjection] init parameters.financingMode =', parameters.financingMode);
