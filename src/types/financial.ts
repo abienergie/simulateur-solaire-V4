@@ -41,6 +41,7 @@ export interface FinancialParametersType {
   remiseCommerciale: number;
   batterySelection?: BatterySelection;
   connectionType?: string;
+  calculateWithVAT?: boolean;
 }
 
 export interface YearlyProjection {
