@@ -75,29 +75,30 @@ export const PHYSICAL_BATTERIES: PhysicalBattery[] = [
   }
 ];
 
+// Note: Les prix incluent déjà la TVA 20% (prix TTC)
 export const VIRTUAL_BATTERIES: VirtualBattery[] = [
   {
     capacity: 100,
-    monthlyPrice: 15,
-    initialFee: 2000,
+    monthlyPrice: 15, // TTC (12.50€ HT + TVA 20%)
+    initialFee: 2000, // TTC (1666.67€ HT + TVA 20%)
     taxesPerKwh: 0.096
   },
   {
     capacity: 300,
-    monthlyPrice: 24,
-    initialFee: 2000,
+    monthlyPrice: 24, // TTC (20€ HT + TVA 20%)
+    initialFee: 2000, // TTC (1666.67€ HT + TVA 20%)
     taxesPerKwh: 0.096
   },
   {
     capacity: 600,
-    monthlyPrice: 30,
-    initialFee: 2000,
+    monthlyPrice: 30, // TTC (25€ HT + TVA 20%)
+    initialFee: 2000, // TTC (1666.67€ HT + TVA 20%)
     taxesPerKwh: 0.096
   },
   {
     capacity: 900,
-    monthlyPrice: 35,
-    initialFee: 2000,
+    monthlyPrice: 35, // TTC (29.17€ HT + TVA 20%)
+    initialFee: 2000, // TTC (1666.67€ HT + TVA 20%)
     taxesPerKwh: 0.096
   }
 ];
