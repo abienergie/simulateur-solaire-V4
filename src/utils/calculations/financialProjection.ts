@@ -1,6 +1,7 @@
 import { FinancialParameters, FinancialProjection, YearlyProjection } from '../../types/financial';
 import { getSubscriptionPrice, getPriceFromPower, calculateFinalPrice } from './priceCalculator';
 import { PHYSICAL_BATTERIES, VIRTUAL_BATTERIES } from '../constants/batteryOptions';
+import { calculateHT } from './vatCalculator';
 
 function calculateYearlyValues(
   params: FinancialParameters,
@@ -48,7 +49,9 @@ function calculateYearlyValues(
   const dureeAbonnement = params.dureeAbonnement || 20;
   let coutAbonnement = 0;
   if (params.financingMode === 'subscription' && year <= dureeAbonnement) {
-    coutAbonnement = getSubscriptionPrice(puissanceCrete, dureeAbonnement) * 12;
+    const subscriptionPrice = getSubscriptionPrice(puissanceCrete, dureeAbonnement);
+    // Si calculateWithVAT est true, on utilise le prix HT
+    coutAbonnement = params.calculateWithVAT ? calculateHT(subscriptionPrice) * 12 : subscriptionPrice * 12;
   }
 
   // Add monthly cost of physical battery in subscription mode
@@ -58,7 +61,8 @@ function calculateYearlyValues(
     params.batterySelection.model?.monthlyPrice &&
     year <= dureeAbonnement
   ) {
-    coutAbonnement += params.batterySelection.model.monthlyPrice * 12;
+    const batteryMonthlyPrice = params.batterySelection.model.monthlyPrice;
+    coutAbonnement += params.calculateWithVAT ? calculateHT(batteryMonthlyPrice) * 12 : batteryMonthlyPrice * 12;
   }
 
   // MyLight/Battery costs
@@ -68,11 +72,13 @@ function calculateYearlyValues(
       // Smart Battery costs - monthly subscription only, no setup fee
       const virtualBattery = VIRTUAL_BATTERIES.find(b => b.capacity === params.batterySelection?.virtualCapacity);
       if (virtualBattery) {
-        coutMyLight = virtualBattery.monthlyPrice * 12;
+        const monthlyPrice = virtualBattery.monthlyPrice;
+        coutMyLight = params.calculateWithVAT ? calculateHT(monthlyPrice) * 12 : monthlyPrice * 12;
       }
     } else if (params.batterySelection.type === 'mybattery') {
       // MyBattery: 1.20€/kWc/month (TVA 20%), no setup fee
-      coutMyLight = puissanceCrete * 1.20 * 12;
+      const monthlyPrice = puissanceCrete * 1.20;
+      coutMyLight = params.calculateWithVAT ? calculateHT(monthlyPrice) * 12 : monthlyPrice * 12;
     }
   }
 
@@ -135,12 +141,17 @@ export function generateFinancialProjection(
     }
   }
 
-  const prixFinal = calculateFinalPrice(
+  let prixFinal = calculateFinalPrice(
     puissanceCrete,
     params.primeAutoconsommation,
     params.remiseCommerciale,
     microOnduleurs
   );
+
+  // Si calculateWithVAT est true et mode cash, convertir en HT
+  if (params.calculateWithVAT && params.financingMode === 'cash') {
+    prixFinal = calculateHT(prixFinal);
+  }
 
   let fraisActivation = 0;
   let smartBatteryInitialCost = 0;
