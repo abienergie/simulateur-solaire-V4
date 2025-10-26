@@ -1,5 +1,6 @@
 import { SubsidyRanges, Subsidy } from '../../types/subsidies';
 import { FinancialSettings } from '../../types/financial';
+import { supabase } from '../../lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 
 // Client Supabase pour les tables externes (subscription_prices)
@@ -200,70 +201,45 @@ export function getPriceFromPower(power: number): number {
 let isLoadingPrices = false;
 let loadingPromise: Promise<void> | null = null;
 
-// Prix d'abonnement par défaut (fallback)
-const FALLBACK_SUBSCRIPTION_PRICES: {[key: string]: {[key: number]: number}} = {
-  '25': {
-    2.5: 49.00, 3.0: 59.00, 3.5: 68.50, 4.0: 78.00, 4.5: 87.00,
-    5.0: 96.00, 5.5: 105.50, 6.0: 115.00, 6.5: 124.00,
-    7.0: 132.00, 7.5: 140.00, 8.0: 149.00, 8.5: 158.00, 9.0: 167.00,
-    12.0: 195.70, 15.0: 243.50, 18.0: 290.00, 20.0: 320.00,
-    25.0: 395.00, 30.0: 470.00, 36.0: 560.00
-  },
-  '20': {
-    2.5: 51.60, 3.0: 63.60, 3.5: 72.00, 4.0: 82.80, 4.5: 92.00,
-    5.0: 100.80, 5.5: 111.60, 6.0: 120.00, 6.5: 129.60,
-    7.0: 138.00, 7.5: 146.40, 8.0: 156.00, 8.5: 164.40, 9.0: 174.00,
-    12.0: 210.50, 15.0: 260.60, 18.0: 310.00, 20.0: 340.00,
-    25.0: 420.00, 30.0: 500.00, 36.0: 595.00
-  },
-  '15': {
-    2.5: 56.40, 3.0: 73.20, 3.5: 80.40, 4.0: 91.20, 4.5: 102.00,
-    5.0: 111.60, 5.5: 122.40, 6.0: 130.80, 6.5: 142.80,
-    7.0: 150.00, 7.5: 159.60, 8.0: 169.20, 8.5: 177.60, 9.0: 189.60,
-    12.0: 237.00, 15.0: 291.80, 18.0: 340.00, 20.0: 375.00,
-    25.0: 460.00, 30.0: 550.00, 36.0: 655.00
-  },
-  '10': {
-    2.5: 67.20, 3.0: 86.40, 3.5: 97.20, 4.0: 106.80, 4.5: 120.00,
-    5.0: 134.40, 5.5: 144.00, 6.0: 153.60, 6.5: 165.60,
-    7.0: 174.00, 7.5: 178.80, 8.0: 192.00, 8.5: 200.40, 9.0: 206.40,
-    12.0: 297.60, 15.0: 363.60, 18.0: 420.00, 20.0: 460.00,
-    25.0: 570.00, 30.0: 680.00, 36.0: 810.00
-  }
-};
-
-// Cache pour les prix Supabase
+// Cache pour les prix Supabase (source unique de vérité)
 let subscriptionPricesCache: {[key: string]: {[key: number]: number}} | null = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION = 30 * 1000; // 30 secondes pour voir les changements plus rapidement
+const CACHE_DURATION = 30 * 1000; // 30 secondes
 
-// Fonction synchrone pour obtenir les prix d'abonnement
+// IMPORTANT: Tous les prix dans ce fichier sont en TTC
+// La conversion HT/TTC se fait au niveau des composants React via vatCalculator.ts
+
+// Fonction synchrone pour obtenir les prix d'abonnement (TTC) - UNIQUEMENT DEPUIS SUPABASE
 export function getSubscriptionPrice(power: number, duration: number): number {
   const roundedPower = Math.round(power * 2) / 2;
-  
-  // Utiliser le cache Supabase s'il est disponible et valide
+
+  // Utiliser UNIQUEMENT le cache Supabase
   if (subscriptionPricesCache) {
-    console.log('🔍 Recherche prix pour', roundedPower, 'kWc,', duration, 'ans dans cache Supabase');
+    console.log('🔍 Recherche prix TTC pour', roundedPower, 'kWc,', duration, 'ans dans cache Supabase');
     console.log('📊 Cache disponible:', Object.keys(subscriptionPricesCache));
     console.log('📊 Puissances disponibles pour', duration, 'ans:', Object.keys(subscriptionPricesCache[duration.toString()] || {}));
-    
+
     const price = subscriptionPricesCache[duration.toString()]?.[roundedPower];
     if (price) {
-      console.log('✅ Prix trouvé dans cache Supabase:', price, '€');
+      console.log('✅ Prix TTC trouvé dans cache Supabase:', price, '€');
       return price;
     } else {
       console.log('❌ Prix non trouvé dans cache Supabase pour', roundedPower, 'kWc');
     }
   }
-  
-  console.log('🔄 Fallback sur prix par défaut pour', roundedPower, 'kWc,', duration, 'ans');
-  // Fallback sur les prix par défaut
-  const fallbackPrice = FALLBACK_SUBSCRIPTION_PRICES[duration.toString()]?.[roundedPower] || 0;
-  console.log('📋 Prix fallback:', fallbackPrice, '€');
-  return fallbackPrice;
+
+  // Si pas de cache, retourner 0 et déclencher le chargement
+  console.warn('⚠️ Cache Supabase non chargé, prix = 0€. Chargement en cours...');
+
+  // Déclencher le chargement si pas déjà en cours
+  if (!isLoadingPrices) {
+    loadSubscriptionPricesFromSupabase();
+  }
+
+  return 0;
 }
 
-// Fonction pour charger les prix depuis Supabase en arrière-plan
+// Fonction pour charger les prix depuis Supabase externe en arrière-plan
 async function loadSubscriptionPricesFromSupabase(): Promise<void> {
   if (isLoadingPrices && loadingPromise) {
     await loadingPromise;
@@ -273,30 +249,31 @@ async function loadSubscriptionPricesFromSupabase(): Promise<void> {
   isLoadingPrices = true;
   loadingPromise = (async () => {
     try {
-      console.log('🔄 Chargement des prix d\'abonnement depuis Supabase...');
-      
+      console.log('🔄 Chargement des prix d\'abonnement TTC depuis Supabase externe...');
+
       // Ajouter un timeout et une gestion d'erreur améliorée
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 secondes timeout
-      
+
+      // Utiliser le client externe pour récupérer les prix
       const { data, error } = await externalSupabase
         .from('subscription_prices')
         .select('*')
         .order('power_kwc')
         .abortSignal(controller.signal);
-      
+
       clearTimeout(timeoutId);
-      
+
       if (error) {
-        console.warn('⚠️ Erreur Supabase (utilisation du fallback):', error);
-        return;
+        console.error('❌ Erreur Supabase externe lors du chargement des prix:', error);
+        throw error;
       }
-      
+
       if (!data || data.length === 0) {
-        console.warn('⚠️ Aucune donnée de prix d\'abonnement trouvée (utilisation du fallback)');
-        return;
+        console.error('❌ Aucune donnée de prix d\'abonnement trouvée dans Supabase externe');
+        throw new Error('No subscription prices found in database');
       }
-      
+
       // Convertir les données en format cache
       const newCache: {[key: string]: {[key: number]: number}} = {
         '25': {},
@@ -304,7 +281,7 @@ async function loadSubscriptionPricesFromSupabase(): Promise<void> {
         '15': {},
         '10': {}
       };
-      
+
       data.forEach(row => {
         const power = parseFloat(row.power_kwc);
         newCache['25'][power] = parseFloat(row.duration_25_years);
@@ -312,32 +289,33 @@ async function loadSubscriptionPricesFromSupabase(): Promise<void> {
         newCache['15'][power] = parseFloat(row.duration_15_years);
         newCache['10'][power] = parseFloat(row.duration_10_years);
       });
-      
+
       subscriptionPricesCache = newCache;
       cacheTimestamp = Date.now();
-      
-      console.log('✅ Prix d\'abonnement chargés depuis Supabase:', Object.keys(newCache['25']).length, 'puissances');
-      
+
+      console.log('✅ Prix d\'abonnement TTC chargés depuis Supabase externe:', Object.keys(newCache['25']).length, 'puissances');
+
       // Déclencher un événement pour notifier les composants
       window.dispatchEvent(new CustomEvent('subscriptionPricesUpdated'));
-      
+
       // Log détaillé du cache pour debug
-      console.log('📊 Cache Supabase détaillé:');
+      console.log('📊 Cache Supabase externe détaillé:');
       Object.entries(newCache).forEach(([duration, prices]) => {
         console.log(`  ${duration} ans:`, Object.keys(prices).map(p => `${p}kWc=${prices[p]}€`).join(', '));
       });
-      
+
     } catch (error) {
       if (error.name === 'AbortError') {
-        console.warn('⚠️ Timeout Supabase (10s) - utilisation du fallback');
+        console.error('❌ Timeout Supabase externe (10s) lors du chargement des prix');
       } else {
-        console.warn('⚠️ Erreur réseau Supabase - utilisation du fallback:', error.message);
+        console.error('❌ Erreur réseau Supabase externe:', error.message);
       }
+      // Ne pas définir de cache en cas d'erreur
     } finally {
       isLoadingPrices = false;
     }
   })();
-  
+
   await loadingPromise;
 }
 
@@ -345,7 +323,7 @@ async function loadSubscriptionPricesFromSupabase(): Promise<void> {
 export function initializeSubscriptionPrices(): void {
   // Charger les prix en arrière-plan sans bloquer l'interface
   loadSubscriptionPricesFromSupabase().catch(error => {
-    console.warn('⚠️ Impossible de charger les prix depuis Supabase au démarrage:', error);
+    console.error('❌ Impossible de charger les prix depuis Supabase externe au démarrage:', error);
   });
 }
 
