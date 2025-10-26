@@ -35,8 +35,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_Bolt Database_URL: ${{ secrets.VITE_Bolt Database_URL }}
-          VITE_Bolt Database_ANON_KEY: ${{ secrets.VITE_Bolt Database_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
 
       - name: Create .nojekyll file
