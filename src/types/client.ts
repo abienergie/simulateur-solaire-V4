@@ -8,6 +8,7 @@ export interface ClientInfo {
   adresse?: string;
   codePostal?: string;
   ville?: string;
+  assujettieATVA?: boolean;
 }
 
 export interface Address {
