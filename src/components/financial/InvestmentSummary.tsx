@@ -3,6 +3,8 @@ import { Calculator, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
 import { FinancialParameters } from '../../types/financial';
 import { calculateTotalInvestment, getMonthlySubscriptionCost, InvestmentBreakdown } from '../../utils/calculations/investmentCalculator';
 import { formatCurrency } from '../../utils/formatters';
+import { useClient } from '../../contexts/client';
+import { calculateHT } from '../../utils/calculations/vatCalculator';
 
 interface InvestmentSummaryProps {
   parameters: FinancialParameters;
@@ -21,9 +23,16 @@ export default function InvestmentSummary({
   includeEcojoko,
   className = ''
 }: InvestmentSummaryProps) {
+  const { clientInfo } = useClient();
   const [investment, setInvestment] = useState<InvestmentBreakdown | null>(null);
   const [monthlySubscription, setMonthlySubscription] = useState<number>(0);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // Vérifier si TVA activée
+  const showVAT = clientInfo.typeClient === 'professionnel' && clientInfo.assujettieATVA === true;
+
+  // Helper pour convertir en HT si nécessaire
+  const getPrice = (ttcPrice: number) => showVAT ? calculateHT(ttcPrice) : ttcPrice;
 
   // Recalculate investment when parameters change
   useEffect(() => {
@@ -119,55 +128,55 @@ export default function InvestmentSummary({
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span>Installation de base</span>
-              <span>{formatCurrency(investment.baseInstallation)}</span>
+              <span>{formatCurrency(getPrice(investment.baseInstallation))}</span>
             </div>
-            
+
             {investment.enphaseUpgrade > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Option Enphase</span>
-                <span>{formatCurrency(investment.enphaseUpgrade)}</span>
+                <span>{formatCurrency(getPrice(investment.enphaseUpgrade))}</span>
               </div>
             )}
-            
+
             {investment.physicalBattery > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Batterie physique</span>
-                <span>{formatCurrency(investment.physicalBattery)}</span>
+                <span>{formatCurrency(getPrice(investment.physicalBattery))}</span>
               </div>
             )}
-            
+
             {investment.smartCharger > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Smart Charger</span>
-                <span>{formatCurrency(investment.smartCharger)}</span>
+                <span>{formatCurrency(getPrice(investment.smartCharger))}</span>
               </div>
             )}
-            
+
             {investment.mountingSystem > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Système de fixation</span>
-                <span>{formatCurrency(investment.mountingSystem)}</span>
+                <span>{formatCurrency(getPrice(investment.mountingSystem))}</span>
               </div>
             )}
-            
+
             {investment.ecojoko > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Option Ecojoko</span>
-                <span>{formatCurrency(investment.ecojoko)}</span>
+                <span>{formatCurrency(getPrice(investment.ecojoko))}</span>
               </div>
             )}
-            
+
             {investment.smartBatterySetup > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Frais SmartBattery</span>
-                <span>{formatCurrency(investment.smartBatterySetup)}</span>
+                <span>{formatCurrency(getPrice(investment.smartBatterySetup))}</span>
               </div>
             )}
-            
+
             {investment.myBatterySetup > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Frais MyBattery</span>
-                <span>{formatCurrency(investment.myBatterySetup)}</span>
+                <span>{formatCurrency(getPrice(investment.myBatterySetup))}</span>
               </div>
             )}
           </div>
@@ -175,23 +184,23 @@ export default function InvestmentSummary({
           <div className="border-t pt-2">
             <div className="flex justify-between text-sm">
               <span>Sous-total</span>
-              <span>{formatCurrency(investment.subtotal)}</span>
+              <span>{formatCurrency(getPrice(investment.subtotal))}</span>
             </div>
-            
+
             {investment.subsidies > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>Prime autoconsommation</span>
                 <span>-{formatCurrency(investment.subsidies)}</span>
               </div>
             )}
-            
+
             {investment.commercialDiscount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>Remise commerciale</span>
                 <span>-{formatCurrency(investment.commercialDiscount)}</span>
               </div>
             )}
-            
+
             {investment.promoDiscount > 0 && (
               <div className="flex justify-between text-sm text-purple-600">
                 <span>Code promo</span>
@@ -199,12 +208,12 @@ export default function InvestmentSummary({
               </div>
             )}
           </div>
-          
+
           <div className="border-t pt-4">
             <div className="flex justify-between items-center">
-              <span className="text-lg font-semibold">Total à payer</span>
+              <span className="text-lg font-semibold">Total à payer {showVAT ? 'HT' : 'TTC'}</span>
               <span className="text-2xl font-bold text-blue-600">
-                {formatCurrency(investment.totalInvestment)}
+                {formatCurrency(getPrice(investment.totalInvestment))}
               </span>
             </div>
           </div>
@@ -214,9 +223,9 @@ export default function InvestmentSummary({
           {/* Subscription mode */}
           <div className="text-center">
             <div className="text-3xl font-bold text-purple-600 mb-2">
-              {formatCurrency(monthlySubscription)}
+              {formatCurrency(getPrice(monthlySubscription))}
             </div>
-            <p className="text-sm text-gray-600">par mois</p>
+            <p className="text-sm text-gray-600">par mois {showVAT ? 'HT' : ''}</p>
           </div>
           
           {investment.smartBatterySetup > 0 && (
