@@ -31,14 +31,13 @@ export default defineConfig({
           }
         ]
       },
-      // Désactiver complètement le service worker
       disable: true,
       devOptions: {
         enabled: false
       }
     })
   ],
-  base: './', // Utiliser des chemins relatifs
+  base: './',
   build: {
     outDir: 'dist',
     sourcemap: false,
