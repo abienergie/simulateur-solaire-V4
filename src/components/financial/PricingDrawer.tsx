@@ -3,6 +3,8 @@ import { Battery, CreditCard, Clock, Zap, Shield, Coins, Wrench, Ticket, X, BarC
 import { formatCurrency } from '../../utils/formatters';
 import { useFinancialSettings } from '../../contexts/FinancialSettingsContext';
 import { usePromoCode } from '../../hooks/usePromoCode';
+import { useClient } from '../../contexts/client';
+import { calculateHT } from '../../utils/calculations/vatCalculator';
 
 interface PricingDrawerProps {
   isOpen: boolean;
@@ -47,6 +49,7 @@ export default function PricingDrawer({
   numberOfPanels
 }: PricingDrawerProps) {
   const { settings } = useFinancialSettings();
+  const { clientInfo } = useClient();
   const { 
     promoCodes,
     validPromoCodes,
@@ -69,37 +72,45 @@ export default function PricingDrawer({
   const isMyBattery = batterySelection?.type === 'mybattery';
   const isSmartBattery = batterySelection?.type === 'virtual';
   const isPhysicalBattery = batterySelection?.type === 'physical';
-  
-  // Setup fees
-  const myBatteryFee = isMyBattery ? (freeBatterySetup ? 0 : 179) : 0;
-  const smartBatteryFee = isSmartBattery ? (freeSmartBatterySetup ? 0 : 2000) : 0;
-  
+
+  // Vérifier si TVA activée
+  const showVAT = clientInfo.typeClient === 'professionnel' && clientInfo.assujettieATVA === true;
+
+  // Helper pour convertir en HT si nécessaire
+  const getPrice = (ttcPrice: number) => showVAT ? calculateHT(ttcPrice) : ttcPrice;
+
+  // Setup fees (converted to HT if VAT enabled)
+  const myBatteryFee = isMyBattery ? (freeBatterySetup ? 0 : getPrice(179)) : 0;
+  const smartBatteryFee = isSmartBattery ? (freeSmartBatterySetup ? 0 : getPrice(2000)) : 0;
+
   // Calculate setup fees and include smart charger in cash mode
   const setupFees = myBatteryFee + smartBatteryFee;
-  
-  // Include Ecojoko price if selected
-  const ecojokoActualPrice = includeEcojoko && !freeEcojoko ? ecojokoPrice : 0;
 
-  // Calculate totals
-  const preTotalPrice = basePrice + enphasePrice + batteryPrice + smartChargerPrice + setupFees + mountingSystemCost + ecojokoActualPrice - (connectionType === 'surplus' ? primeAutoconsommation : 0);
-  const cashTotalPrice = financingMode === 'cash' 
+  // Include Ecojoko price if selected (converted to HT if VAT enabled)
+  const ecojokoActualPrice = includeEcojoko && !freeEcojoko ? getPrice(ecojokoPrice) : 0;
+
+  // Calculate totals (all prices converted to HT if VAT enabled)
+  const preTotalPrice = getPrice(basePrice) + getPrice(enphasePrice) + getPrice(batteryPrice) + getPrice(smartChargerPrice) + setupFees + getPrice(mountingSystemCost) + ecojokoActualPrice - (connectionType === 'surplus' ? primeAutoconsommation : 0);
+  const cashTotalPrice = financingMode === 'cash'
     ? preTotalPrice - discount
     : 0;
-    
-  // Calculate monthly battery cost
-  const monthlyBatteryCost = isMyBattery 
-    ? installedPower * 1.20 // MyBattery: 1.20€/kWc/month
-    : isSmartBattery && batterySelection?.virtualCapacity 
-      ? myLightPrice / 12 // Smart Battery: based on capacity
+
+  // Calculate monthly battery cost (converted to HT if VAT enabled)
+  const monthlyBatteryCost = isMyBattery
+    ? getPrice(installedPower * 1.20) // MyBattery: 1.20€/kWc/month
+    : isSmartBattery && batterySelection?.virtualCapacity
+      ? getPrice(myLightPrice / 12) // Smart Battery: based on capacity
       : isPhysicalBattery && batterySelection?.model?.monthlyPrice
-        ? batterySelection.model.monthlyPrice // Physical battery: monthly price from model
+        ? getPrice(batterySelection.model.monthlyPrice) // Physical battery: monthly price from model
         : 0;
-      
-  // Total monthly payment including battery
-  const monthlyTotal = subscriptionPrice + (myLightPrice / 12) + (isPhysicalBattery ? monthlyBatteryCost : 0);
-  
-  // Calculate security deposit based only on subscription price, not including MyLight
-  const securityDeposit = subscriptionPrice * 2;
+
+  // Total monthly payment including battery (converted to HT if VAT enabled)
+  const monthlyTotal = getPrice(subscriptionPrice) + getPrice(myLightPrice / 12) + (isPhysicalBattery ? monthlyBatteryCost : 0);
+
+  // Calculate security deposit: 3 months for professionals with VAT, 2 months otherwise
+  // La caution n'est PAS soumise à la TVA selon les clarifications
+  const depositMonths = showVAT ? 3 : 2;
+  const securityDeposit = getPrice(subscriptionPrice) * depositMonths;
 
   // Show subsidy only in surplus mode
   const showSubsidy = connectionType === 'surplus';
@@ -334,8 +345,8 @@ export default function PricingDrawer({
 
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Prix de base TTC</span>
-                      <span className="font-medium">{formatCurrency(basePrice)}</span>
+                      <span className="text-gray-600">Prix de base {showVAT ? 'HT' : 'TTC'}</span>
+                      <span className="font-medium">{formatCurrency(getPrice(basePrice))}</span>
                     </div>
 
                     {enphasePrice > 0 && (
@@ -344,7 +355,7 @@ export default function PricingDrawer({
                           <Zap className="h-4 w-4 text-gray-400" />
                           <span className="text-gray-600">Option Enphase</span>
                         </div>
-                        <span className="font-medium">{formatCurrency(enphasePrice)}</span>
+                        <span className="font-medium">{formatCurrency(getPrice(enphasePrice))}</span>
                       </div>
                     )}
 
@@ -356,7 +367,7 @@ export default function PricingDrawer({
                             {mountingSystem === 'bac-lestes' ? 'Bac léstés' : 'Intégration (IAB)'}
                           </span>
                         </div>
-                        <span className="font-medium">{formatCurrency(mountingSystemCost)}</span>
+                        <span className="font-medium">{formatCurrency(getPrice(mountingSystemCost))}</span>
                       </div>
                     )}
 
@@ -366,7 +377,7 @@ export default function PricingDrawer({
                           <Battery className="h-4 w-4 text-gray-400" />
                           <span className="text-gray-600">Batterie physique</span>
                         </div>
-                        <span className="font-medium">{formatCurrency(batteryPrice)}</span>
+                        <span className="font-medium">{formatCurrency(getPrice(batteryPrice))}</span>
                       </div>
                     )}
 
@@ -376,7 +387,7 @@ export default function PricingDrawer({
                           <Zap className="h-4 w-4 text-gray-400" />
                           <span className="text-gray-600">Smart Charger</span>
                         </div>
-                        <span className="font-medium">{formatCurrency(smartChargerPrice)}</span>
+                        <span className="font-medium">{formatCurrency(getPrice(smartChargerPrice))}</span>
                       </div>
                     )}
 
@@ -387,9 +398,9 @@ export default function PricingDrawer({
                           <span className="text-gray-600">Frais d'activation MyBattery</span>
                         </div>
                         {freeBatterySetup ? (
-                          <span className="font-medium line-through">{formatCurrency(179)}</span>
+                          <span className="font-medium line-through">{formatCurrency(getPrice(179))}</span>
                         ) : (
-                          <span className="font-medium">{formatCurrency(179)}</span>
+                          <span className="font-medium">{formatCurrency(getPrice(179))}</span>
                         )}
                       </div>
                     )}
@@ -411,9 +422,9 @@ export default function PricingDrawer({
                           <span className="text-gray-600">Option Ecojoko</span>
                         </div>
                         {freeEcojoko ? (
-                          <span className="font-medium line-through">{formatCurrency(ecojokoPrice)}</span>
+                          <span className="font-medium line-through">{formatCurrency(ecojokoActualPrice)}</span>
                         ) : (
-                          <span className="font-medium">{formatCurrency(ecojokoPrice)}</span>
+                          <span className="font-medium">{formatCurrency(ecojokoActualPrice)}</span>
                         )}
                       </div>
                     )}
@@ -446,7 +457,7 @@ export default function PricingDrawer({
 
                     <div className="pt-3 border-t border-gray-100">
                       <div className="flex justify-between font-semibold">
-                        <span>Total TTC</span>
+                        <span>Total {showVAT ? 'HT' : 'TTC'}</span>
                         <span className="text-blue-600">{formatCurrency(cashTotalPrice)}</span>
                       </div>
                     </div>
@@ -462,20 +473,20 @@ export default function PricingDrawer({
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Abonnement mensuel ({duration} ans)</span>
-                      <span className="font-medium">{formatCurrency(subscriptionPrice)}</span>
+                      <span className="font-medium">{formatCurrency(getPrice(subscriptionPrice))}</span>
                     </div>
 
                     {isPhysicalBattery && batterySelection?.model?.monthlyPrice && (
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Batterie physique (mensuel)</span>
-                        <span className="font-medium">{formatCurrency(batterySelection.model.monthlyPrice)}</span>
+                        <span className="font-medium">{formatCurrency(getPrice(batterySelection.model.monthlyPrice))}</span>
                       </div>
                     )}
 
                     {myLightPrice > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">MyLight (mensuel)</span>
-                        <span className="font-medium">{formatCurrency(myLightPrice / 12)}</span>
+                        <span className="font-medium">{formatCurrency(getPrice(myLightPrice / 12))}</span>
                       </div>
                     )}
 
@@ -486,9 +497,9 @@ export default function PricingDrawer({
                           <span className="text-gray-600">Option Ecojoko</span>
                         </div>
                         {freeEcojoko ? (
-                          <span className="font-medium line-through">{formatCurrency(ecojokoPrice)}</span>
+                          <span className="font-medium line-through">{formatCurrency(getPrice(ecojokoPrice))}</span>
                         ) : (
-                          <span className="font-medium">{formatCurrency(ecojokoPrice)}</span>
+                          <span className="font-medium">{formatCurrency(getPrice(ecojokoPrice))}</span>
                         )}
                       </div>
                     )}
@@ -525,12 +536,12 @@ export default function PricingDrawer({
                       </div>
                       {freeDeposit ? (
                         <div className="flex justify-between text-sm text-amber-800">
-                          <span className="line-through">Dépôt de garantie (2 mois)</span>
+                          <span className="line-through">Dépôt de garantie ({depositMonths} mois)</span>
                           <span className="font-medium line-through">{formatCurrency(securityDeposit)}</span>
                         </div>
                       ) : (
                         <div className="flex justify-between text-sm text-amber-800">
-                          <span>Dépôt de garantie (2 mois)</span>
+                          <span>Dépôt de garantie ({depositMonths} mois)</span>
                           <span className="font-medium">{formatCurrency(securityDeposit)}</span>
                         </div>
                       )}
@@ -590,7 +601,7 @@ export default function PricingDrawer({
 
                     <div className="pt-3 border-t border-gray-100">
                       <div className="flex justify-between font-semibold">
-                        <span>Total mensuel TTC</span>
+                        <span>Total mensuel {showVAT ? 'HT' : 'TTC'}</span>
                         <span className="text-purple-600">{formatCurrency(monthlyTotal)}</span>
                       </div>
                       {freeMonths > 0 && (
